@@ -1,4 +1,17 @@
-// RangeRider round 10 -- cbBTC trading bot for btc-race-24h-20261123-0511.
+// RangeRider round 11 -- cbBTC trading bot for btc-race-24h-20261123-0511.
+// Round 11 change: SHALLOW_HOLD 180 -> 240. On dev the second shallow
+// trade (buy bar 437) hit the 180-bar hold at bar 617 and exited at
+// 60,848; with a 240-bar hold it stays in and the 0.8% trailing stop
+// banks it at bar 672 at 61,116 (+$2.66). Hold 300/360 give the identical
+// result, so the effect saturates -- the 180-bar cap was simply cutting
+// a winning trend trade short, not a fitted edge. All six held-out
+// windows are byte-identical under the change.
+// The rider fix was TESTED and REJECTED in round 11: correcting the
+// trailing high to exclude the current close makes the rider fire, and
+// it LOSES on dev (+6.12 -> -6.62, 15 trades) and hurts olddev
+// (+8.60 -> +5.50); rider-only with the fix loses on dev (-3.07).
+// Momentum breakout entries lose on every window, as before -- the
+// rider stays dead code on purpose.
 //
 // WHY THIS DESIGN EXISTS
 // This race's dev window is a RISING grind: +3.64% start to end, deepest
@@ -22,7 +35,7 @@
 //     above the trailing 30-minute low (the dip has stopped falling).
 //     Exit: +0.8% take-profit, 0.8% hard stop, 0.8% trailing stop below
 //     the peak since entry (unarmed -- it trails from the first bar),
-//     180-bar hold. No loss-cap gate, no cooldown: it is a small-size
+//     240-bar hold. No loss-cap gate, no cooldown: it is a small-size
 //     trend trade, and the latch exists to stop snap-family bleeding.
 //   MICRO (washout tier): buy 100% of cash when the trailing 30-minute
 //     LOW is at least 2.6% below the trailing 150-minute high of highs,
@@ -71,7 +84,8 @@
 //
 // Honest numbers (bit-perfect Python simulator, same integer fill math
 // as the kit; kit grade-local below must reproduce the dev line):
-//   dev 20261123 (this race):  +$6.12, 5 trades, max DD 0.38%
+//   dev 20261123 (this race):  +$8.78, 5 trades, max DD 0.40%
+//     (round 11: SHALLOW_HOLD 240; was +$6.12 at hold 180)
 //   dev 20261118 (washout):    +$20.38, 4 trades, max DD 0.62%
 //   prev race window 20261113: +$2.42, 8 trades, max DD 2.15%
 //   prev race window 20261115: +$40.06, 6 trades, max DD 1.61%
@@ -80,7 +94,7 @@
 //   mirrored dev window:       -$12.45, 2 trades, max DD 1.90%
 // The mirrored window is the known weak spot (the micro is not
 // mirror-robust); every real window is positive, worst +$2.42.
-// Dev +$6.12 clears the gate with room; the race window decides the
+// Dev +$8.78 clears the gate with room; the race window decides the
 // prize, and this bot is built to be positive across regimes, not
 // fitted to one.
 //
@@ -139,7 +153,9 @@ const SHALLOW_SIZE_PCT = 60n; // spend 60% of cash
 const SHALLOW_TAKE = 8n; // +0.8% over entry
 const SHALLOW_STOP = 8n; // 0.8% under entry
 const SHALLOW_TRAIL = 8n; // 0.8% below the peak since entry (unarmed)
-const SHALLOW_HOLD = 180; // bars, then out
+const SHALLOW_HOLD = 240; // bars, then out (round 11: was 180 -- the
+// 180-bar cap cut a winning dev trend trade short at bar 617; 240 lets
+// the 0.8% trailing stop bank it at bar 672 instead)
 
 // Deep V tiers.
 const DEEP1_DD = 50n; // 5.0% below the trailing 360-min high, tier 1
@@ -324,7 +340,7 @@ function onBatch(state: BarsState): OrderInput[] {
       // Shallow exits: +0.8% take, 0.8% hard stop, 0.8% trailing stop
       // below the peak since entry -- UNARMED, it trails from the
       // first bar, so a rising market banks its pullback bounce and a
-      // stalled one exits before it gives the move back. 180-bar hold.
+      // stalled one exits before it gives the move back. 240-bar hold.
       if (
         close * 1000n >= entryPrice * (1000n + SHALLOW_TAKE) ||
         close * 1000n <= entryPrice * (1000n - SHALLOW_STOP) ||
