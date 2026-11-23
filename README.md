@@ -2,10 +2,37 @@
 [![rank](https://make.fun/badge/btc-race-24h-20261123-0511/giber76/btc-race-20261123-entry/rank.svg)](https://make.fun/bounty/btc-race-24h-20261123-0511)
 [![reward](https://make.fun/badge/btc-race-24h-20261123-0511/giber76/btc-race-20261123-entry/reward.svg)](https://make.fun/bounty/btc-race-24h-20261123-0511)
 
-# RangeRider round 12 — immediate-open — cbBTC trading bot
+# RangeRider round 13 — worst-window lift — cbBTC trading bot
 
 Entry for [make.fun btc-race-24h-20261123-0511](https://make.fun/bounty/btc-race-24h-20261123-0511)
 ("Race a BTC trading bot live for 24 hours", $50, top 10 on the live 24h race window).
+
+## Why round 13 exists
+
+Round 12 is profitable everywhere real, but its worst window is thin:
+prev race window 20261113 sits at only +$1.85, dragged down by one
+losing shallow trade (−$6.84). Round 13 makes four small changes,
+each verified on all 7 windows in the bit-perfect simulator, optimised
+for the worst window and dev together:
+- **Shallow dip 0.8% → 1.0%:** the 1.0% dip never fires on oos13, so
+  the losing shallow trade disappears and oos13 goes +$1.85 → +$8.53
+  (snaps only), for −$0.65 dev. 0.9% and 1.1% give identical results;
+  1.2% breaks dev (+$5.76).
+- **Opener size 15% → 20%:** dev +$0.48; 25% gives dev +$11.09 but
+  costs the worst window, so 20% is the sweet spot.
+- **Opener take-profit 0.8% → 1.2%:** dev +$0.29, no cost anywhere.
+- **Snap tier-1 stop 0.8% → 0.6%:** the tighter stop exits losing
+  snaps earlier and frees the wave budget for more winning snaps on
+  oos15, +$39.80 → +$41.14, no cost anywhere.
+Result: dev +$10.53 (was +$10.32), worst real window +$6.36
+(live17 — was +$1.85 oos13), mean real-window PnL +$15.74
+(was +$14.46). First buy stays bar 30–41 everywhere. Rejected in
+round 13: opener 25–30% (worst window falls), opener stop/trail
+0.6% (oos13 +$1.28), snap trend filter (breaks oos13/oos15 or is
+inert), shallow 0.6% (oos15/olddev fall), shallow size 40/80%
+(dev falls / oos13 goes negative), snap TP1 1.3% and micro TP 1.4%
+(dev18/live17 fall), snap size 60/80% (worst real window falls to
++$4.91 for a synthetic-mirror gain — not worth it).
 
 ## Why round 12 exists
 
@@ -45,18 +72,18 @@ A five-mode bot with only relative triggers (trailing highs, a moving
 average, the entry price) — no absolute price level, no schedule — so the
 same rules fire on any fresh 24-hour window.
 
-- **Opener (new in round 12):** for the first 120 bars only, first wave
-  only: buy 15% of cash at the first close that passes the shallow
+- **Opener (new in round 12, tuned in round 13):** for the first 120 bars only, first wave
+  only: buy 20% of cash at the first close that passes the shallow
   trend filter (close above its 240-minute average) and the recovery
   filter (close 0.2% above the trailing 30-minute low), with NO dip
-  requirement. Exit: +0.8% take-profit, 0.4% hard stop, 0.4% trailing
+  requirement. Exit: +1.2% take-profit, 0.4% hard stop, 0.4% trailing
   stop below the peak since entry (unarmed), 240-bar hold.
-- **Shallow dip (new in round 10):** buy 60% of cash when the close is at
-  least 0.8% below the trailing 60-minute high of closes, the close is
+- **Shallow dip (new in round 10, tuned in round 13):** buy 60% of cash when the close is at
+  least 1.0% below the trailing 60-minute high of closes, the close is
   above its 240-minute average (uptrend filter), and the close is at least
   0.2% above the trailing 30-minute low. Exit: +0.8% take-profit, 0.8%
   hard stop, 0.8% trailing stop below the peak since entry (unarmed),
-  180-bar hold. No loss-cap gate, no cooldown.
+  240-bar hold. No loss-cap gate, no cooldown.
 - **Washout micro:** buy 100% of cash when the trailing 30-minute low is
   at least 2.6% below the trailing 150-minute high of highs, the close is
   at or above that low, and the close 30 bars ago was within 1.0% below
@@ -67,8 +94,8 @@ same rules fire on any fresh 24-hour window.
 - **Snapback:** buy 100% of cash when the close is ≥ 2.0% below the
   trailing 420-minute high of bar highs, only if the close is at least
   0.2% above the trailing 30-minute low. Exit: +1.0% take-profit, 0.8%
-  trailing stop once +0.8% up, 0.8% hard stop (tier 1; 2.5% for tier 2),
-  240-bar hold. Tier 2 takes profit at +0.8%. A 20-bar cooldown after an
+  trailing stop once +0.8% up, 0.6% hard stop (tier 1, round 13: was
+  0.8%; 2.5% for tier 2), 240-bar hold. Tier 2 takes profit at +0.8%. A 20-bar cooldown after an
   exit (40 after a losing snap exit) and a 1% loss cap latching snap
   entries off below $990 realised equity.
 - **Deep V tiers (crash windows):** tier 1 buys 40% of cash at 5.0%
@@ -84,7 +111,19 @@ same rules fire on any fresh 24-hour window.
 
 ## Honest numbers (bit-perfect Python simulator, same integer fill math as the kit)
 
-Round 12 (immediate-open) vs round 11; first-buy bar in brackets:
+Round 13 vs round 12; first-buy bar in brackets:
+
+| Window | Round 13 PnL | Trades | Max DD | First buy |
+|---|---|---|---|---|
+| dev 20261123 (this race) | +$10.53 | 6 | 0.36% | bar 40 |
+| dev 20261118 (washout) | +$20.09 | 6 | 0.62% | bar 38 |
+| prev race window 20261113 | +$8.53 | 8 | 2.19% | bar 34 |
+| prev race window 20261115 | +$41.14 | 12 | 1.63% | bar 41 |
+| old dev window 20261117 | +$7.80 | 4 | 0.65% | bar 30 |
+| live 20261117 replay | +$6.36 | 5 | 0.43% | bar 34 |
+| mirrored dev window | −$13.45 | 4 | 1.90% | bar 30 |
+
+Round 12 numbers for comparison:
 
 | Window | Round 12 PnL | Trades | Max DD | First buy |
 |---|---|---|---|---|
@@ -108,10 +147,11 @@ Round 11 numbers for comparison:
 | live 20261117 replay | +$7.26 | 3 | 0.43% |
 | mirrored dev window | −$12.45 | 2 | 1.90% |
 
-Dev +$10.32 clears the gate with room. The mirrored window is the known
-weak spot (the micro is not mirror-robust); every real window is
-positive, worst +$1.85. The race window decides the prize, and this bot
-is built to be positive across regimes, not fitted to one.
+Dev +$10.53 clears the gate with room. The mirrored window is the known
+weak spot (one bad snap in a falling market); every real window is
+positive, worst +$6.36 (was +$1.85 in round 12). The race window decides
+the prize, and this bot is built to be positive across regimes, not
+fitted to one.
 
 ## Run
 

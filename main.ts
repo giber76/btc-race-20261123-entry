@@ -29,8 +29,8 @@
 // wide 0.8% trailing exit that lets a rising market pay.
 //
 // MODES (one position at a time, long only, $1,000 paper, 1-minute bars):
-//   SHALLOW (new): buy 60% of cash when the close is at least 0.8% below
-//     the trailing 60-minute high of closes, the close is above its
+//   SHALLOW (new): buy 60% of cash when the close is at least 1.0% below
+//     the trailing 60-minute high of closes (round 13: was 0.8%), the close is above its
 //     240-minute average (uptrend filter), and the close is at least 0.2%
 //     above the trailing 30-minute low (the dip has stopped falling).
 //     Exit: +0.8% take-profit, 0.8% hard stop, 0.8% trailing stop below
@@ -146,7 +146,7 @@ const SNAP_DIP2 = 27n; // 2.7% below that high (tier 2)
 const SNAP_HI_WIN = 420;
 const SNAP_SIZE_PCT = 100n; // spend 100% of cash
 const SNAP_TAKE1 = 10n; // +1.0% over entry (tier 1)
-const SNAP_STOP1 = 8n; // 0.8% under entry (tier 1)
+const SNAP_STOP1 = 6n; // 0.6% under entry (tier 1) (round 13: was 0.8% -- the tighter stop exits losing snaps earlier and frees the wave budget for more winning snaps on oos15, +$39.80 -> +$41.14, no cost on any other window)
 const SNAP_TAKE2 = 8n; // +0.8% over entry (tier 2)
 const SNAP_STOP2 = 25n; // 2.5% under entry (tier 2)
 const SNAP_ARM = 8n; // trail arms once +0.8% up
@@ -161,7 +161,7 @@ const LOSS_CAP_USDC = 990_000_000n; // stop snap/micro entries below $990 equity
 
 // Shallow-dip tier (new in round 10): trend-filtered pullback buys for
 // rising windows, where the washout tiers never fire.
-const SHALLOW_DIP = 8n; // 0.8% below the trailing 60-min high of closes
+const SHALLOW_DIP = 10n; // 1.0% below the trailing 60-min high of closes (round 13: was 0.8% -- the 0.8% dip bought a losing shallow trade on oos13; 1.0% skips it and lifts the worst window +$1.85 -> +$8.53 for -$0.65 dev, recovered by the opener changes below)
 const SHALLOW_HI_WIN = 60; // trailing high window, minutes
 const SHALLOW_TREND_WIN = 240; // close must sit above this average
 const SHALLOW_REC_WIN = 30; // trailing low window, minutes
@@ -193,10 +193,35 @@ const SHALLOW_HOLD = 240; // bars, then out (round 11: was 180 -- the
 // 60% breaks oos13 negative (-$0.40 at the 0.4% stop, -$21.25 at
 // the 0.8% stop). 15% is the size that buys the early open for
 // ~$0.12 mean give-back across real windows.
+//
+// ROUND 13: four small changes, each verified in the bit-perfect
+// simulator on all 7 windows (worst real window + dev together):
+//   SHALLOW_DIP 0.8% -> 1.0%: the 0.8% dip bought a losing shallow
+//     trade on oos13 (-$6.84); 1.0% never fires there, so oos13 goes
+//     +$1.85 -> +$8.74 (snaps only) for -$0.65 dev. 0.9% and 1.1%
+//     give identical results; 1.2% breaks dev (+$5.76).
+//   OPENER_SIZE 15% -> 20%: dev +$10.32 -> +$10.80 at the 0.8% dip;
+//     25% gives dev +$11.27 but costs the worst window.
+//   OPENER_TAKE 0.8% -> 1.2%: dev +$0.29 (the opener runs further
+//     before the 0.4% trail exits it); no cost anywhere else.
+//   SNAP_STOP1 0.8% -> 0.6%: oos15 +$39.80 -> +$41.14 (the tighter
+//     stop frees the wave budget for more winning snaps); no cost
+//     anywhere else.
+// Final (simulator): dev +$10.53 (6t, dd 0.36%, first buy bar 40),
+// dev18 +$20.09, oos13 +$8.53, oos15 +$41.14, olddev +$7.80,
+// live17 +$6.36, mirrored -$13.45 (synthetic, one bad snap). Worst
+// real window +$6.36 (live17) vs v2 +$1.85 (oos13); mean real-window
+// PnL +$15.74 vs v2 +$14.46. Rejected in round 13: opener 25-30%
+// (worst window falls), opener stop/trail 0.6% (oos13 +$1.28),
+// snap trend filter (tol 0.5-1.0% breaks oos13/oos15, tol 2.0% is
+// inert), shallow 0.6% (oos15/olddev fall), shallow size 40/80%
+// (dev falls / oos13 goes negative), snap TP1 1.3% and micro TP 1.4%
+// (dev18/live17 fall), snap size 60/80% (worst real window falls to
+// +$4.91 for a synthetic-mirror gain -- not worth it).
 const OPENER_UNTIL = 120; // bars: opener only while closes seen <= 120
 const OPENER_DIP = 0n; // 0%: no pullback required, first trend bar buys
-const OPENER_SIZE_PCT = 15n; // spend 15% of cash (starter tranche)
-const OPENER_TAKE = 8n; // +0.8% over entry
+const OPENER_SIZE_PCT = 20n; // spend 20% of cash (starter tranche) (round 13: was 15% -- the 20-25% sweet spot: 25% gives dev +$11.09 but costs the worst window; 20% keeps the worst window at +$6.36)
+const OPENER_TAKE = 12n; // +1.2% over entry (round 13: was +0.8% -- the 0.4% trailing stop exits first on most windows, but on dev the wider take lets the opener run to +$2.39 instead of +$1.53)
 const OPENER_STOP = 4n; // 0.4% under entry
 const OPENER_TRAIL = 4n; // 0.4% below the peak since entry (unarmed)
 const OPENER_HOLD = 240; // bars, then out
