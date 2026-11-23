@@ -98,6 +98,23 @@
 // prize, and this bot is built to be positive across regimes, not
 // fitted to one.
 //
+// ROUND 12 (immediate-open): the opener (see OPENER_* constants).
+// Same simulator, all 7 windows, first-buy bar in brackets:
+//   dev 20261123 (this race):  +$10.32, 7 trades, max DD 0.40% [40]
+//   dev 20261118 (washout):    +$20.18, 6 trades, max DD 0.62% [38]
+//   prev race window 20261113: +$1.85, 10 trades, max DD 2.16% [34]
+//   prev race window 20261115: +$39.80, 8 trades, max DD 1.69% [41]
+//   old dev window 20261117:   +$8.02, 4 trades, max DD 0.62% [30]
+//   live 20261117 replay:      +$6.61, 5 trades, max DD 0.43% [34]
+//   mirrored dev window:       -$13.18, 4 trades, max DD 1.90% [30]
+// v1's first-buy bars were 214 / 69 / 251 / 378 / 567 / 214 / 210.
+// The opener costs ~$0.12 of mean PnL across real windows versus
+// v1 and improves dev by +$1.54; the worst real window stays
+// positive at +$1.85. Rejected along the way: 40-60% openers (oos13
+// goes to +$0.71 / -$0.40 / -$21.25), a 0.4%-dip opener (never fires
+// early on dev: first buy still bar 214), the rider fix (dev
+// +$6.12 -> -$6.62, round 11), warmup 10 (oos13 -$0.94).
+//
 // Deterministic: integer arithmetic on the bars the harness sends; no
 // clock, no randomness, no network, no files. Standard library only,
 // plus the kit's TypeScript shim vendored under vendor/ (byte-for-byte
@@ -157,6 +174,33 @@ const SHALLOW_HOLD = 240; // bars, then out (round 11: was 180 -- the
 // 180-bar cap cut a winning dev trend trade short at bar 617; 240 lets
 // the 0.8% trailing stop bank it at bar 672 instead)
 
+// OPENER (round 12, immediate-open): a starter tranche so the bot is
+// in the market from the first hour instead of waiting 3-9 hours for a
+// 0.8% pullback (v1's first trade was bar 214 on dev, bar 567 on
+// olddev). For the first 120 bars only, and only for the very first
+// wave, the shallow tier may enter with NO dip requirement (dip 0%:
+// buy at the first close that passes the SAME trend + recovery
+// filters as shallow) at 15% of cash. It is NOT a breakout buy: no
+// new-high requirement, no momentum chase -- it buys the current
+// price once the uptrend filter says the market is above its
+// 240-minute average. Its exits are TIGHTER than shallow's (0.4%
+// stop / 0.4% trailing) so a falling open costs at most ~$1.60 +
+// fees on the $150 tranche. Tested in the bit-perfect simulator
+// (all 7 windows): first buy bar 30-41 everywhere (v1: 69-567);
+// dev +$10.32 (v1 +$8.78), worst real window +$1.85 (oos13, v1
+// +$2.42); every real window stays positive. A 40% opener at the
+// same exits improves dev more (+$12.57) but leaves oos13 at +$0.71;
+// 60% breaks oos13 negative (-$0.40 at the 0.4% stop, -$21.25 at
+// the 0.8% stop). 15% is the size that buys the early open for
+// ~$0.12 mean give-back across real windows.
+const OPENER_UNTIL = 120; // bars: opener only while closes seen <= 120
+const OPENER_DIP = 0n; // 0%: no pullback required, first trend bar buys
+const OPENER_SIZE_PCT = 15n; // spend 15% of cash (starter tranche)
+const OPENER_TAKE = 8n; // +0.8% over entry
+const OPENER_STOP = 4n; // 0.4% under entry
+const OPENER_TRAIL = 4n; // 0.4% below the peak since entry (unarmed)
+const OPENER_HOLD = 240; // bars, then out
+
 // Deep V tiers.
 const DEEP1_DD = 50n; // 5.0% below the trailing 360-min high, tier 1
 const DEEP2_DD = 53n; // 5.3% below the trailing 360-min high, tier 2
@@ -183,7 +227,7 @@ const HISTORY = 720; // closes kept (longest lookback is 420)
 const SLIPPAGE_BPS = 400; // cap vs the latest close
 const MIN_NOTIONAL = 1_000_000n; // 1 USDC in quote units
 
-type Mode = 'snap' | 'deep' | 'rider' | 'micro' | 'shallow';
+type Mode = 'snap' | 'deep' | 'rider' | 'micro' | 'shallow' | 'opener';
 
 /** Closes at price scale 5, oldest first. */
 const closes: bigint[] = [];
@@ -336,6 +380,21 @@ function onBatch(state: BarsState): OrderInput[] {
       }
       return [];
     }
+    if (mode === 'opener') {
+      // Opener exits: +0.8% take, 0.4% hard stop, 0.4% trailing stop
+      // below the peak since entry -- UNARMED, it trails from the
+      // first bar. The tight stop is what bounds the cost of opening
+      // into a falling market (~$1.60 on the $150 tranche).
+      if (
+        close * 1000n >= entryPrice * (1000n + OPENER_TAKE) ||
+        close * 1000n <= entryPrice * (1000n - OPENER_STOP) ||
+        close * 1000n <= peakSinceEntry * (1000n - OPENER_TRAIL) ||
+        holdBars >= OPENER_HOLD
+      ) {
+        return [{ side: 'sell', symbol: SYMBOL, qty, max_slippage_bps: SLIPPAGE_BPS }];
+      }
+      return [];
+    }
     if (mode === 'shallow') {
       // Shallow exits: +0.8% take, 0.8% hard stop, 0.8% trailing stop
       // below the peak since entry -- UNARMED, it trails from the
@@ -447,19 +506,28 @@ function onBatch(state: BarsState): OrderInput[] {
   // but ONLY in an uptrend (close above its 240-minute average) and
   // off a stopped fall (close 0.2% above the trailing 30-minute low).
   // 60% of cash. No latch gate, no cooldown: small size, trend trade.
+  // OPENER (round 12): while closes seen <= 120 and no wave has
+  // fired yet, the dip requirement is 0% and the size is 15% -- the
+  // first close passing the same trend + recovery filters opens a
+  // starter tranche, so the bot holds a position from the first hour
+  // instead of waiting for a 0.8% pullback that can take 3-9 hours
+  // to appear. It enters as mode 'opener' for the tighter exits.
   {
     const high60 = highest(SHALLOW_HI_WIN);
     const sma240 = mean(SHALLOW_TREND_WIN);
     const low30 = lowest(SHALLOW_REC_WIN);
+    const isOpener = closes.length <= OPENER_UNTIL && waves === 0;
+    const dip = isOpener ? OPENER_DIP : SHALLOW_DIP;
+    const sizePct = isOpener ? OPENER_SIZE_PCT : SHALLOW_SIZE_PCT;
     if (
       closeNow >= sma240 &&
       closeNow * 1000n >= low30 * (1000n + SHALLOW_REC) &&
-      closeNow * 1000n <= high60 * (1000n - SHALLOW_DIP)
+      closeNow * 1000n <= high60 * (1000n - dip)
     ) {
       waves += 1;
-      mode = 'shallow';
+      mode = isOpener ? 'opener' : 'shallow';
       cashAtOpen = state.cash;
-      return [buy((state.cash * SHALLOW_SIZE_PCT) / 100n)];
+      return [buy((state.cash * sizePct) / 100n)];
     }
   }
 

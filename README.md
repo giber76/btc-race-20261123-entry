@@ -2,10 +2,27 @@
 [![rank](https://make.fun/badge/btc-race-24h-20261123-0511/giber76/btc-race-20261123-entry/rank.svg)](https://make.fun/bounty/btc-race-24h-20261123-0511)
 [![reward](https://make.fun/badge/btc-race-24h-20261123-0511/giber76/btc-race-20261123-entry/reward.svg)](https://make.fun/bounty/btc-race-24h-20261123-0511)
 
-# RangeRider round 10 — cbBTC trading bot
+# RangeRider round 12 — immediate-open — cbBTC trading bot
 
 Entry for [make.fun btc-race-24h-20261123-0511](https://make.fun/bounty/btc-race-24h-20261123-0511)
 ("Race a BTC trading bot live for 24 hours", $50, top 10 on the live 24h race window).
+
+## Why round 12 exists
+
+Round 11 is profitable on dev (+$8.78) but waits **hours** for its first
+trade: its first buy lands on bar 214 of the dev window (3h34m), bar 567
+on the old dev window (9h27m). A live race that opens flat wastes most
+of the day in cash. Round 12 adds an **opener**: for the first 120 bars
+only, and only for the very first wave, the shallow tier may enter with
+no dip requirement at 15% of cash, on the SAME trend + recovery filters
+as shallow, with tighter exits (0.4% stop / 0.4% trailing). It is not a
+breakout buy — no new-high requirement, no momentum chase — it buys the
+current price once the uptrend filter passes. The 15% size is the size
+that buys the early open for ~$0.12 of mean give-back across real
+windows: a 40% opener leaves the worst real window at +$0.71, 60%
+breaks it negative, and a 0.4%-dip opener never fires early on dev at
+all. First buy is bar 30–41 on every tested window; dev improves to
++$10.32.
 
 ## Why round 10 exists
 
@@ -28,6 +45,12 @@ A five-mode bot with only relative triggers (trailing highs, a moving
 average, the entry price) — no absolute price level, no schedule — so the
 same rules fire on any fresh 24-hour window.
 
+- **Opener (new in round 12):** for the first 120 bars only, first wave
+  only: buy 15% of cash at the first close that passes the shallow
+  trend filter (close above its 240-minute average) and the recovery
+  filter (close 0.2% above the trailing 30-minute low), with NO dip
+  requirement. Exit: +0.8% take-profit, 0.4% hard stop, 0.4% trailing
+  stop below the peak since entry (unarmed), 240-bar hold.
 - **Shallow dip (new in round 10):** buy 60% of cash when the close is at
   least 0.8% below the trailing 60-minute high of closes, the close is
   above its 240-minute average (uptrend filter), and the close is at least
@@ -61,9 +84,23 @@ same rules fire on any fresh 24-hour window.
 
 ## Honest numbers (bit-perfect Python simulator, same integer fill math as the kit)
 
+Round 12 (immediate-open) vs round 11; first-buy bar in brackets:
+
+| Window | Round 12 PnL | Trades | Max DD | First buy |
+|---|---|---|---|---|
+| dev 20261123 (this race) | +$10.32 | 7 | 0.40% | bar 40 (r11: 214) |
+| dev 20261118 (washout) | +$20.18 | 6 | 0.62% | bar 38 (r11: 69) |
+| prev race window 20261113 | +$1.85 | 10 | 2.16% | bar 34 (r11: 251) |
+| prev race window 20261115 | +$39.80 | 8 | 1.69% | bar 41 (r11: 378) |
+| old dev window 20261117 | +$8.02 | 4 | 0.62% | bar 30 (r11: 567) |
+| live 20261117 replay | +$6.61 | 5 | 0.43% | bar 34 (r11: 214) |
+| mirrored dev window | −$13.18 | 4 | 1.90% | bar 30 (r11: 210) |
+
+Round 11 numbers for comparison:
+
 | Window | PnL | Trades | Max DD |
 |---|---|---|---|
-| dev 20261123 (this race) | +$6.12 | 5 | 0.38% |
+| dev 20261123 (this race) | +$8.78 | 5 | 0.40% |
 | dev 20261118 (washout) | +$20.38 | 4 | 0.62% |
 | prev race window 20261113 | +$2.42 | 8 | 2.15% |
 | prev race window 20261115 | +$40.06 | 6 | 1.61% |
@@ -71,9 +108,9 @@ same rules fire on any fresh 24-hour window.
 | live 20261117 replay | +$7.26 | 3 | 0.43% |
 | mirrored dev window | −$12.45 | 2 | 1.90% |
 
-Dev +$6.12 clears the gate with room. The mirrored window is the known
+Dev +$10.32 clears the gate with room. The mirrored window is the known
 weak spot (the micro is not mirror-robust); every real window is
-positive, worst +$2.42. The race window decides the prize, and this bot
+positive, worst +$1.85. The race window decides the prize, and this bot
 is built to be positive across regimes, not fitted to one.
 
 ## Run
