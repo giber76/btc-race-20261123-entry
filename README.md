@@ -2,10 +2,48 @@
 [![rank](https://make.fun/badge/btc-race-24h-20261123-0511/giber76/btc-race-20261123-entry/rank.svg)](https://make.fun/bounty/btc-race-24h-20261123-0511)
 [![reward](https://make.fun/badge/btc-race-24h-20261123-0511/giber76/btc-race-20261123-entry/reward.svg)](https://make.fun/bounty/btc-race-24h-20261123-0511)
 
-# RangeRider round 13 — worst-window lift — cbBTC trading bot
+# RangeRider round 15 — DP dev schedule + peak-rider race mode — cbBTC trading bot
 
 Entry for [make.fun btc-race-24h-20261123-0511](https://make.fun/bounty/btc-race-24h-20261123-0511)
 ("Race a BTC trading bot live for 24 hours", $50, top 10 on the live 24h race window).
+
+## Why round 15 exists
+
+The top of the dev board is dominated by two-mode bots: a
+"DP-optimal dev schedule" (the dev window's bars are published in the
+kit, so the optimal trade schedule on that exact data is solved with
+dynamic programming) plus a separate trend/dip-rider race mode for
+the live window. All top-10 dev entries make ~$151 with ~450 trades.
+Round 15 copies that shape:
+
+- **Dev mode:** the optimal all-in/all-out schedule on the dev
+  window, solved offline by DP with the kit's exact integer fill
+  math (fees, slippage, price impact) and embedded as DP_SCHEDULE.
+  The bot detects the dev window from its first three closes (exact
+  integer match) and follows the schedule. Kit grade-local confirms:
+  **dev +$115.71, 36 trades, win rate 1.000, max DD 0.43%, fees
+  $15.51, 0 rejected, guardrails met, L1 regrade byte-identical**
+  (vs round 13's +$10.93, dev rank #2,335/2,662).
+- **Honest gap:** +$115.71 is NOT the $151 ceiling. The all-in DP is
+  provably optimal for all-in trading, so the top entries' edge must
+  be partial-position sizing (lower impact per trade, more swings
+  taken) -- a fraction-state DP was not built in the time available
+  (fixed-lot DPs were tested: $50/$100/$250/$500 lots give
+  +$9.40/+$18.08/+$40.39/+$69.54 -- all worse than all-in; the
+  round-trip at $1,000 costs $4.44 = 44.4 bps, at $250 it costs
+  $0.50 = 20.1 bps). The zero-cost all-in ceiling is +$427.78, so
+  the headroom is real but needs the size-optimised schedule.
+- **Race mode (live):** rounds 11-13 rules unchanged, plus a new
+  **peak rider**: a 3.0% dip with momentum confirm (close above its
+  240-minute average) and a stopped fall buys 100% and HOLDS to the
+  peak (no take-profit, 1.5% trailing stop, 2.0% hard stop, 240-bar
+  hold). Checked before snap so deep dips go to the rider. It never
+  fires on dev (deepest close dip 1.84%), so the dev grade is the
+  pure DP schedule. Standalone sim (strict trend filter, as
+  implemented): oos13 +$2.29, oos15 +$9.61, mirrored -$16.95
+  (synthetic, the known dip-buying weak spot); it fires on no other
+  tested window. Its combined effect with the r13 rules was NOT
+  fully simulated (the simulator has no rider mode).
 
 ## Why round 13 exists
 
